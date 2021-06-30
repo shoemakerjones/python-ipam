@@ -1,23 +1,25 @@
 # this program is designed to manage soho networks that might be harder to keep track of. 
 # its written in console to make it as lightweight as possible.
 import os
-import json
+import sqlite3
 
 def cls():
     os.system('cls' if os.name=='nt' else 'clear')
 
 spacer = print("")
 
+#pyMongoConnect = pymongo.MongoClient('mongodb://localhost:27017/')
+#ipamDB = pyMongoConnect['IPAddressManagement'] # Database
+#ipAddressTable = ipamDB['IP Address Table'] # Collection (table if you are mysql user)
+
 def mainMenu():
     cls()
     print("VRH81's IP Management Address Tool.")
     print("This tool is designed to store IP addresses for easier management.")
     spacer
-    print("1 - List all networks")
+    print("1 - View networks")
     print("2 - Create a network")
     print("3 - Remove a network")
-    print("4 - Add IP addresses")
-    print("5 - Remove IP addresses")
     print("0 - Exit")
     spacer
 
@@ -29,10 +31,6 @@ def mainMenu():
         networkCreate()
     elif menuChoice == 3:
         networkRemove() # TODO
-    elif menuChoice == 4:
-        ipAdd() # TODO
-    elif menuChoice == 5:
-        ipRemove() # TODO
     elif menuChoice == 0:
         quit()
     else:
@@ -49,23 +47,26 @@ def networkList():
     netListChoice = int(input())
     if netListChoice == 1:
         cls()
-        print("1 - Find by network name")
-        print("2 - Find by network ID")
+        dbcon = sqlite3.connect('networks.db')
+        dbcur = dbcon.cursor()
 
-        netListChoice2 = int(input())
-        if netListChoice2 == 1:
-            cls()
-            print("Type name of network: ")
-            networkSearchName = input()
-            #networksFile = open('networks.txt', 'r') # TODO
-            networkList()
+        searchInput = input('Enter device name, interface, ip address or network ID: ')
+
+        dbsearch = dbcon.execute("SELECT device,interface,ipaddr,netmask,netid FROM iptable WHERE device,interface,ipaddr,netmask,netid = VALUES (?);", (searchInput))
+        networkList()
     elif netListChoice == 2:
         cls()
-        networkFile = open('networks.txt','r')
-        networkFileContent = networkFile.read()
-        print(networkFileContent)
-        spacer
+        dbcon = sqlite3.connect('networks.db')
+        dbsearch = dbcon.execute("SELECT device,interface,ipaddr,netmask,netid FROM iptable")
+
+        for row in dbsearch:
+            print('Device = ' + row[0])
+            print('Interface = ' + row[1])
+            print('IP address = ' + row[2])
+            print('Subnet mask = ' + row[3])
+            print('Network ID = ' + row[4] + '\n')
         input()
+        dbcon.close()
         mainMenu()
     else:
         print("You need to type something that I can work with >:(")
@@ -74,25 +75,48 @@ def networkList():
 
 def networkCreate():
     cls()
-    print("Give your network a name:")
-    networkCreateName = input()
-    spacer
-    print("Now type in the network ID in the format of X.X.X.X")
-    networkCreateID = input()
-    spacer
-    networkFile = open('networks.txt','a+')
-    networkFile.write("Name: " + networkCreateName + "\n")
-    networkFile.write("ID: " + networkCreateID + "\n\n")
-    networkFile.close()
+
+    networkCreateDev = input("Enter device name: ")
+    networkCreateInt = input("Enter interface: ")
+    networkCreateIP = input("Enter IP address (x.x.x.x): ")
+    networkCreateMask = input("Enter subnet mask (x.x.x.x): ")
+    networkCreateID = input("Enter network ID (x.x.x.x): ")
+
+    networkTable = {
+        "device":networkCreateDev,
+        "interface":networkCreateInt,
+        "ipaddr":networkCreateIP,
+        "subnetmask":networkCreateMask,
+        "netid":networkCreateID
+        }
+
+    dbcon = sqlite3.connect('networks.db')
+    dbcur = dbcon.cursor()
+
+    dbcur.execute('''SELECT count(name) FROM sqlite_master WHERE type='table' AND name='iptable' ''')
+
+    if dbcur.fetchone()[0]==1:
+        insertScript = "INSERT INTO iptable (device,interface,ipaddr,netmask,netid) VALUES (?,?,?,?,?);"
+        dbcur.execute(insertScript,(networkCreateDev,networkCreateInt,networkCreateIP,networkCreateMask,networkCreateID))
+        dbcon.commit()
+        dbcon.close()
+
+    else:
+        dbcur.execute('''CREATE TABLE iptable (device,interface,ipaddr,netmask,netid)''')
+        insertScript = "INSERT INTO iptable (device,interface,ipaddr,netmask,netid) VALUES (?,?,?,?,?);"
+        dbcur.execute(insertScript,(networkCreateDev,networkCreateInt,networkCreateIP,networkCreateMask,networkCreateID))
+        dbcon.commit()
+        dbcon.close()
+
     cls()
-    print("Your network has been saved.")
-    input()
+    print('Device: ' + networkTable['device'])
+    print('Interface: ' + networkTable['interface'])
+    print('IP Address: ' + networkTable['ipaddr'])
+    print('Subnet Mask: ' + networkTable['subnetmask'])
+    print('Network ID: ' + networkTable['netid'] + '\n\n')
+    input("Your network has been saved.")
     mainMenu()
         
-#def networkRemove(): # TODO   
-
-#def ipAdd(): # TODO
-
-#def ipRemove():# TODO
+#def networkRemove(): # TODO
 
 mainMenu()
